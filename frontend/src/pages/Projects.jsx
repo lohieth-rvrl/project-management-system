@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOutletContext } from "react-router-dom";
-import { api, list } from "../api.js";
+import { api } from "../api.js";
 import Badge from "../components/Badge.jsx";
+import Pagination from "../components/Pagination.jsx";
+import usePaged from "../components/usePaged.js";
 
 const blank = { code: "", name: "", status: "planning", budget: "", hourly_rate: "", start_date: "", end_date: "" };
 
@@ -14,9 +16,9 @@ export default function Projects() {
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(null);
 
-  const { data: projects = [], isLoading } = useQuery({
-    queryKey: ["projects"], queryFn: () => list("/projects/"),
-  });
+  const pg = usePaged("projects", "/projects/");
+  const projects = pg.rows;
+  const isLoading = pg.isLoading;
   const { data: summary } = useQuery({
     queryKey: ["summary", selected], enabled: !!selected,
     queryFn: () => api(`/analytics/projects/${selected}/summary/`),
@@ -82,6 +84,7 @@ export default function Projects() {
             </tbody>
           </table>
         )}
+        <Pagination page={pg.page} pageSize={pg.pageSize} count={pg.count} onPage={pg.setPage} onPageSize={pg.setPageSize} />
       </div>
 
       {summary && (

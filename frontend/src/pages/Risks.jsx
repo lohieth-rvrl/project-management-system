@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOutletContext } from "react-router-dom";
 import { api, list } from "../api.js";
 import Badge from "../components/Badge.jsx";
+import Pagination from "../components/Pagination.jsx";
+import usePaged from "../components/usePaged.js";
 
 export default function Risks() {
   const { me } = useOutletContext();
@@ -10,7 +12,8 @@ export default function Risks() {
   const [form, setForm] = useState({ project: "", title: "", probability: 3, impact: 3, mitigation: "" });
   const [error, setError] = useState("");
 
-  const { data: risks = [] } = useQuery({ queryKey: ["risks"], queryFn: () => list("/risks/") });
+  const pg = usePaged("risks", "/risks/");
+  const risks = pg.rows;
   const { data: projects = [] } = useQuery({ queryKey: ["projects"], queryFn: () => list("/projects/") });
   const code = (id) => projects.find((p) => p.id === id)?.code || id;
   const canWrite = me && me.role !== "viewer";
@@ -70,6 +73,7 @@ export default function Risks() {
             ))}
           </tbody>
         </table>
+        <Pagination page={pg.page} pageSize={pg.pageSize} count={pg.count} onPage={pg.setPage} onPageSize={pg.setPageSize} />
       </div>
     </>
   );

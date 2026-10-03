@@ -59,9 +59,25 @@ export async function login(username, password) {
   auth.set(await res.json());
 }
 
-// DRF paginates lists as {count, results}
-export const list = async (path) => {
+const withParams = (path, params) => {
   const sep = path.includes("?") ? "&" : "?";
-  const data = await api(`${path}${sep}page_size=200`);
-  return Array.isArray(data) ? data : data.results;
+  return `${path}${sep}${new URLSearchParams(params).toString()}`;
+};
+
+// One page of a DRF list: returns {count, results, next, previous}
+export const paged = (path, page = 1, pageSize = 25) =>
+  api(withParams(path, { page, page_size: pageSize }));
+
+// Every row of a list (follows all pages). Use for dropdowns and the board,
+// not for large tables, which should use paged().
+export const list = async (path) => {
+  const rows = [];
+  let page = 1;
+  for (;;) {
+    const data = await paged(path, page, 200);
+    if (Array.isArray(data)) return data;
+    rows.push(...data.results);
+    if (!data.next) return rows;
+    page += 1;
+  }
 };

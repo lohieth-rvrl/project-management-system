@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOutletContext } from "react-router-dom";
 import { api, list } from "../api.js";
+import Pagination from "../components/Pagination.jsx";
+import usePaged from "../components/usePaged.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -11,12 +13,13 @@ export default function Timesheet() {
   const [form, setForm] = useState({ task: "", work_date: today(), hours: "", note: "" });
   const [error, setError] = useState("");
 
-  const { data: entries = [] } = useQuery({ queryKey: ["time"], queryFn: () => list("/time-entries/") });
+  const pg = usePaged("time", "/time-entries/");
+  const entries = pg.rows;
   const { data: tasks = [] } = useQuery({ queryKey: ["tasks-all"], queryFn: () => list("/tasks/?ordering=title") });
 
   const canApprove = me && ["admin", "manager", "lead"].includes(me.role);
   const canWrite = me && me.role !== "viewer";
-  const total = entries.reduce((s, e) => s + Number(e.hours), 0);
+  const pageTotal = entries.reduce((s, e) => s + Number(e.hours), 0);
 
   const refresh = () => { qc.invalidateQueries({ queryKey: ["time"] }); qc.invalidateQueries({ queryKey: ["overview"] }); };
 
@@ -36,7 +39,7 @@ export default function Timesheet() {
   return (
     <>
       <h1>Timesheet</h1>
-      <div className="sub">{canApprove ? "All logged time. Approve entries below." : "Your logged time"} Total shown: <b>{total}h</b></div>
+      <div className="sub">{canApprove ? "All logged time. Approve entries below." : "Your logged time"} Hours on this page: <b>{pageTotal}h</b></div>
 
       {canWrite && (
         <form className="card form" style={{ marginBottom: 16 }}
@@ -68,6 +71,7 @@ export default function Timesheet() {
             ))}
           </tbody>
         </table>
+        <Pagination page={pg.page} pageSize={pg.pageSize} count={pg.count} onPage={pg.setPage} onPageSize={pg.setPageSize} />
       </div>
     </>
   );

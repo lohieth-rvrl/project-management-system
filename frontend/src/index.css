@@ -49,6 +49,10 @@ label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px
 .tcard .meta { display: flex; justify-content: space-between; margin-top: 8px; color: var(--muted); font-size: 12px; }
 .bar { height: 8px; background: #e8ecf3; border-radius: 4px; overflow: hidden; }
 .bar > i { display: block; height: 100%; background: var(--brand-2); }
+.pager { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.pager-ctl { display: flex; align-items: center; gap: 6px; }
+.pager-ctl select { width: auto; }
+.pager button { padding: 5px 10px; }
 .login { max-width: 360px; margin: 12vh auto; }
 .chart { height: 280px; }
 .muted { color: var(--muted); }
