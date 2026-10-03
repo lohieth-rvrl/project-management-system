@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOutletContext } from "react-router-dom";
 import { api, list } from "../api.js";
 import Badge from "../components/Badge.jsx";
+import TaskDrawer from "../components/TaskDrawer.jsx";
 
 const COLUMNS = [
   ["todo", "To Do"], ["in_progress", "In Progress"], ["review", "In Review"],
@@ -16,6 +17,7 @@ export default function Board() {
   const [over, setOver] = useState(null);
   const [title, setTitle] = useState("");
   const [error, setError] = useState("");
+  const [openTask, setOpenTask] = useState(null);
 
   const { data: projects = [] } = useQuery({ queryKey: ["projects"], queryFn: () => list("/projects/") });
   const pid = project || projects[0]?.id || "";
@@ -84,7 +86,7 @@ export default function Board() {
                 onDrop={canWrite ? drop(key) : undefined}>
                 <h3>{name} ({items.length})</h3>
                 {items.map((t) => (
-                  <div key={t.id} className="tcard" draggable={canWrite}
+                  <div key={t.id} className="tcard" draggable={canWrite} onClick={() => setOpenTask(t)}
                     onDragStart={(e) => e.dataTransfer.setData("text/plain", String(t.id))}>
                     <div>{t.title}</div>
                     <div className="meta">
@@ -98,6 +100,7 @@ export default function Board() {
           })}
         </div>
       )}
+      {openTask && <TaskDrawer key={openTask.id} task={openTask} me={me} onClose={() => setOpenTask(null)} />}
     </>
   );
 }
