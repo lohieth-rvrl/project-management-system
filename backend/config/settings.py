@@ -4,7 +4,8 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-insecure-key-change-me-0123456789abcdef")
+# "or" (not a get() default) so an empty variable also falls back, then trips the production check below
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY") or "dev-insecure-key-change-me-0123456789abcdef"
 DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",") if h.strip()]
 _render_host = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
@@ -71,6 +72,19 @@ if os.environ.get("DATABASE_URL"):
 
     # Render and most hosts provide one connection string
     DATABASES = {"default": dj_database_url.config(conn_max_age=600, conn_health_checks=True)}
+
+    # Optional: keep this app's tables in their own Postgres schema, so it can share a
+    # database with another app (two Django apps in one schema would collide on
+    # django_migrations, auth_* and django_content_type).
+    _schema = os.environ.get("DB_SCHEMA", "").strip()
+    if _schema:
+        import re
+
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,62}", _schema):
+            from django.core.exceptions import ImproperlyConfigured
+
+            raise ImproperlyConfigured("DB_SCHEMA must be a plain identifier (letters, digits, underscore)")
+        DATABASES["default"].setdefault("OPTIONS", {})["options"] = f"-c search_path={_schema}"
 elif os.environ.get("DB_HOST"):
     DATABASES = {
         "default": {
@@ -82,6 +96,11 @@ elif os.environ.get("DB_HOST"):
             "PORT": os.environ.get("DB_PORT", "5432"),
         }
     }
+elif not DEBUG:
+    # A production run must never fall back to a throwaway SQLite file
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured("Set DATABASE_URL (or DB_HOST) when DJANGO_DEBUG=0")
 else:
     # Local fallback so tests run without Postgres
     DATABASES = {

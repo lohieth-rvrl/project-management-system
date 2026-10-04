@@ -40,6 +40,15 @@ Redis, the Celery worker, MinIO and Metabase are **not** deployed on Render. Not
 ### 5. Add your team
 There is no user management screen yet. Create users at `<backend URL>/admin/` (sign in with the same admin login). Set each person's **Role** under the PMS section.
 
+## Sharing a database with another app
+Render allows one free database per workspace. To reuse an existing one, set these on `pms-backend`:
+- `DATABASE_URL`: the database's **Internal Database URL** (Render dashboard → the database → Connections)
+- `DB_SCHEMA`: `pms`
+
+The app then keeps all its tables in its own `pms` schema and never touches the other app's tables. Both apps still share one database's lifetime and storage, so if a free database expires, both lose their data.
+
+The frontend uses hash URLs (`https://.../#/projects`) so the static site needs no rewrite rule.
+
 ## Things to know about the free plan
 Check Render's current pricing and limits, because they change.
 - **Sleeping:** free web services stop after a period of no traffic. The next request can take a minute to wake the API.
