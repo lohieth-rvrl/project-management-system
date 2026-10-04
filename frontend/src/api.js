@@ -1,4 +1,7 @@
-const BASE = "/api";
+// In dev and Docker, requests go to /api and the dev server or Nginx proxies them.
+// On Render the frontend is a separate static site, so VITE_API_URL holds the full
+// backend address, e.g. https://pms-backend.onrender.com/api (set at build time).
+const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 
 export const auth = {
   get access() { return localStorage.getItem("access"); },
