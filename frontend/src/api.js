@@ -38,7 +38,7 @@ export async function api(path, { method = "GET", body, retry = true } = {}) {
   }
   if (res.status === 401) {
     auth.clear();
-    window.location.href = "/login";
+    window.location.hash = "#/login"; // hash routing: no server rewrite needed
     throw new Error("Session expired");
   }
   if (res.status === 204) return null;

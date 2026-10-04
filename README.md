@@ -44,7 +44,7 @@ npm install && npm run dev            # http://localhost:5173 (proxies /api to :
 
 ## Tests
 ```bash
-cd backend && python -m pytest -q     # 33 API tests
+cd backend && python -m pytest -q     # 43 API tests
 cd frontend && npm run build
 ```
 
