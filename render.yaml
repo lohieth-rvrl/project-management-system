@@ -1,0 +1,59 @@
+# Render Blueprint: creates the database, the Django API and the React site.
+# Deploy steps are in DEPLOY_RENDER.md.
+databases:
+  - name: pms-db
+    plan: free
+    databaseName: pms
+    user: pms
+
+services:
+  # Django REST API
+  - type: web
+    name: pms-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    # Free web services have no pre-deploy hook, so migrations run at start-up.
+    startCommand: python manage.py migrate --noinput && python manage.py ensure_admin && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60
+    healthCheckPath: /api/health/
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_ALLOWED_HOSTS
+        value: .onrender.com
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pms-db
+          property: connectionString
+      # Fill these in on the Render dashboard (see DEPLOY_RENDER.md)
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: DJANGO_SUPERUSER_USERNAME
+        value: admin
+      - key: DJANGO_SUPERUSER_PASSWORD
+        sync: false
+      - key: DJANGO_SUPERUSER_EMAIL
+        sync: false
+
+  # React single-page app
+  - type: web
+    name: pms-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      # Let React Router handle every path (refreshing /projects must not 404)
+      - type: rewrite
+        source: /*
+        destination: /index.html

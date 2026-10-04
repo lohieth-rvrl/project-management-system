@@ -28,6 +28,9 @@ docker compose exec backend python manage.py createsuperuser # or use demo users
 Demo logins after `seed_demo` (password `demo12345`): `admin`, `meera` (manager), `arun` (lead),
 `priya` / `karthik` (members), `divya` (viewer).
 
+## Deploy to Render
+See [DEPLOY_RENDER.md](DEPLOY_RENDER.md). The `render.yaml` Blueprint creates the database, API and frontend.
+
 ## Run without Docker
 ```bash
 cd backend
@@ -41,7 +44,7 @@ npm install && npm run dev            # http://localhost:5173 (proxies /api to :
 
 ## Tests
 ```bash
-cd backend && python -m pytest -q     # 28 API tests
+cd backend && python -m pytest -q     # 33 API tests
 cd frontend && npm run build
 ```
 
