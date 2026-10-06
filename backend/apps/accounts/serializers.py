@@ -11,7 +11,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "id", "username", "email", "first_name", "last_name", "full_name",
-            "role", "weekly_capacity_hours", "is_active", "password",
+            "role", "weekly_capacity_hours", "email_notifications", "is_active", "password",
         ]
 
     def get_full_name(self, obj):

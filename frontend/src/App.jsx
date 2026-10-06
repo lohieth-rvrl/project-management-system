@@ -14,11 +14,16 @@ import Tasks from "./pages/Tasks.jsx";
 import ProjectDetail from "./pages/ProjectDetail.jsx";
 import Users from "./pages/Users.jsx";
 import Account from "./pages/Account.jsx";
+import Notifications from "./pages/Notifications.jsx";
 import SearchBox from "./components/SearchBox.jsx";
 
 function Shell() {
   const nav = useNavigate();
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: () => api("/users/me/") });
+
+  const { data: unread } = useQuery({
+    queryKey: ["unread"], queryFn: () => api("/notifications/unread-count/"), refetchInterval: 30000,
+  });
 
   const logout = () => { auth.clear(); queryClient.clear(); nav("/login"); };
 
@@ -36,6 +41,7 @@ function Shell() {
         <NavLink to="/team">Team Workload</NavLink>
         <NavLink to="/users">People</NavLink>
         <NavLink to="/audit">Audit Log</NavLink>
+        <NavLink to="/notifications">Notifications{unread?.count > 0 && <span className="badge" data-testid="unread" style={{ marginLeft: 6 }}>{unread.count}</span>}</NavLink>
         <NavLink to="/account">My Account</NavLink>
         {me && (
           <div className="user">
@@ -63,6 +69,7 @@ export default function App() {
         <Route path="/projects/:id" element={<ProjectDetail />} />
         <Route path="/tasks" element={<Tasks />} />
         <Route path="/users" element={<Users />} />
+        <Route path="/notifications" element={<Notifications />} />
         <Route path="/account" element={<Account />} />
         <Route path="/board" element={<Board />} />
         <Route path="/timesheet" element={<Timesheet />} />

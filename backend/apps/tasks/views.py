@@ -3,6 +3,8 @@ from django.utils import timezone
 from rest_framework import viewsets
 
 from apps.accounts.permissions import RolePermission
+from apps.notifications.models import Notification
+from apps.notifications.services import find_mentions, notify
 
 from .models import Comment, Sprint, Task, TaskDependency
 from .serializers import (CommentSerializer, SprintSerializer, TaskDependencySerializer,
@@ -40,16 +42,33 @@ class TaskViewSet(viewsets.ModelViewSet):
         extra = {"reporter": self.request.user}
         if status == Task.Status.DONE:
             extra["completed_at"] = timezone.now()
-        serializer.save(**extra)
+        task = serializer.save(**extra)
+        if task.assignee_id:
+            self._notify_assigned(task)
 
     def perform_update(self, serializer):
         new_status = serializer.validated_data.get("status")
+        old_status, old_assignee = serializer.instance.status, serializer.instance.assignee_id
         extra = {}
-        if new_status == Task.Status.DONE and serializer.instance.status != Task.Status.DONE:
+        if new_status == Task.Status.DONE and old_status != Task.Status.DONE:
             extra["completed_at"] = timezone.now()
         elif new_status and new_status != Task.Status.DONE:
             extra["completed_at"] = None
-        serializer.save(**extra)
+        task = serializer.save(**extra)
+        if task.assignee_id and task.assignee_id != old_assignee:
+            self._notify_assigned(task)
+        if task.status != old_status:
+            labels = dict(Task.Status.choices)
+            notify([task.assignee, task.reporter], Notification.Kind.STATUS,
+                   f"{task.title}: {labels.get(old_status, old_status)} to {labels.get(task.status, task.status)}",
+                   f"{task.project.code}", f"/tasks?task={task.id}", actor=self.request.user,
+                   webhook=task.status == Task.Status.BLOCKED)
+
+    def _notify_assigned(self, task):
+        notify([task.assignee], Notification.Kind.ASSIGNED, f"You were assigned: {task.title}",
+               f"{task.project.code} - {task.get_priority_display()} priority"
+               + (f", due {task.due_date}" if task.due_date else ""),
+               f"/tasks?task={task.id}", actor=self.request.user)
 
 
 class SprintViewSet(viewsets.ModelViewSet):
@@ -73,4 +92,14 @@ class CommentViewSet(viewsets.ModelViewSet):
     filterset_fields = ["task"]
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        comment = serializer.save(author=self.request.user)
+        task, actor = comment.task, self.request.user
+        who = actor.get_full_name() or actor.username
+        link = f"/tasks?task={task.id}"
+        mentioned = find_mentions(comment.body)
+        notify(mentioned, Notification.Kind.MENTION, f"{who} mentioned you on: {task.title}",
+               comment.body[:300], link, actor=actor)
+        mentioned_ids = {u.pk for u in mentioned}
+        others = [u for u in (task.assignee, task.reporter) if u and u.pk not in mentioned_ids]
+        notify(others, Notification.Kind.COMMENT, f"{who} commented on: {task.title}",
+               comment.body[:300], link, actor=actor)

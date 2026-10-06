@@ -29,8 +29,12 @@ class UserViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         return ChangePasswordSerializer if self.action == "change_password" else UserSerializer
 
-    @action(detail=False, methods=["get"])
+    @action(detail=False, methods=["get", "patch"])
     def me(self, request):
+        if request.method == "PATCH":  # a person may change only their own email preference here
+            if "email_notifications" in request.data:
+                request.user.email_notifications = bool(request.data["email_notifications"])
+                request.user.save(update_fields=["email_notifications"])
         return Response(UserSerializer(request.user).data)
 
     @action(detail=False, methods=["post"], url_path="change-password")
