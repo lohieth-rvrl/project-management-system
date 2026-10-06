@@ -229,3 +229,28 @@ test.describe("people and account", () => {
     await expect(page.getByText("New passwords do not match")).toBeVisible();
   });
 });
+
+test.describe("notifications", () => {
+  test("a mention shows up as an unread badge and can be cleared", async ({ page }) => {
+    await login(page, "priya");
+    await page.getByRole("link", { name: "Task Board" }).click();
+    await page.getByPlaceholder("Add a task and press Enter").fill("E2E mention task");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await page.locator(".tcard", { hasText: "E2E mention task" }).click();
+    const drawer = page.getByRole("dialog", { name: "Task details" });
+    await drawer.getByPlaceholder("Write a comment").fill("please look @karthik");
+    await drawer.getByRole("button", { name: "Post" }).click();
+    await expect(drawer.getByText("please look @karthik")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.mouse.click(5, 5); // click the dimmed backdrop to close the drawer
+    await expect(drawer).toBeHidden();
+    await logout(page);
+
+    await login(page, "karthik");
+    await expect(page.getByTestId("unread")).toBeVisible();
+    await page.getByRole("link", { name: /Notifications/ }).click();
+    await expect(page.getByText("mentioned you on: E2E mention task")).toBeVisible();
+    await page.getByRole("button", { name: "Mark all as read" }).click();
+    await expect(page.getByTestId("unread")).toHaveCount(0);
+  });
+});

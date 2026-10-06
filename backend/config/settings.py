@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "apps.timesheets",
     "apps.risks",
     "apps.analytics",
+    "apps.notifications",
 ]
 
 MIDDLEWARE = [
@@ -173,3 +174,24 @@ SPECTACULAR_SETTINGS = {
 
 CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+
+# --- Notifications ---------------------------------------------------------------
+# Email: set EMAIL_HOST (and usually EMAIL_HOST_USER / EMAIL_HOST_PASSWORD) to send real mail.
+# Without EMAIL_HOST, emails are printed to the server log instead.
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+EMAIL_BACKEND = (
+    "django.core.mail.backends.smtp.EmailBackend" if EMAIL_HOST
+    else "django.core.mail.backends.console.EmailBackend"
+)
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "1") == "1"
+EMAIL_TIMEOUT = 8
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "pms@localhost")
+# Public address of the web app, used for links inside emails
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "")
+# Slack or Microsoft Teams incoming-webhook URL for important events (critical risks, blocked tasks)
+NOTIFY_WEBHOOK_URL = os.environ.get("NOTIFY_WEBHOOK_URL", "")
+# Deliver inline instead of on a background thread (used by the tests)
+NOTIFY_SYNC = os.environ.get("NOTIFY_SYNC", "0") == "1"

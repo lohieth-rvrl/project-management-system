@@ -14,6 +14,7 @@ class Role(models.TextChoices):
 class User(AbstractUser):
     role = models.CharField(max_length=10, choices=Role.choices, default=Role.MEMBER)
     weekly_capacity_hours = models.DecimalField(max_digits=5, decimal_places=2, default=40)
+    email_notifications = models.BooleanField(default=True)
     history = HistoricalRecords()
 
     @property

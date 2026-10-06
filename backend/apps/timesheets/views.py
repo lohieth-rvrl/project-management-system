@@ -4,6 +4,8 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
 from apps.accounts.permissions import RolePermission
+from apps.notifications.models import Notification
+from apps.notifications.services import notify
 
 from .models import TimeEntry
 from .serializers import TimeEntrySerializer
@@ -39,4 +41,7 @@ class TimeEntryViewSet(viewsets.ModelViewSet):
         entry.approved = True
         entry.approved_by = request.user
         entry.save()
+        notify([entry.user], Notification.Kind.APPROVED,
+               f"{entry.hours}h on {entry.work_date} approved", entry.task.title,
+               "/timesheet", actor=request.user)
         return Response(TimeEntrySerializer(entry).data)
