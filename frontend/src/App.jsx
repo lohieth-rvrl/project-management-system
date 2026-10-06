@@ -1,6 +1,7 @@
 import { Navigate, NavLink, Outlet, Route, Routes, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, auth } from "./api.js";
+import { queryClient } from "./queryClient.js";
 import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Projects from "./pages/Projects.jsx";
@@ -9,24 +10,33 @@ import Timesheet from "./pages/Timesheet.jsx";
 import Risks from "./pages/Risks.jsx";
 import Team from "./pages/Team.jsx";
 import Audit from "./pages/Audit.jsx";
+import Tasks from "./pages/Tasks.jsx";
+import ProjectDetail from "./pages/ProjectDetail.jsx";
+import Users from "./pages/Users.jsx";
+import Account from "./pages/Account.jsx";
+import SearchBox from "./components/SearchBox.jsx";
 
 function Shell() {
   const nav = useNavigate();
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: () => api("/users/me/") });
 
-  const logout = () => { auth.clear(); nav("/login"); };
+  const logout = () => { auth.clear(); queryClient.clear(); nav("/login"); };
 
   return (
     <div className="layout">
       <aside className="sidebar">
         <div className="logo">Project Management</div>
+        <SearchBox />
         <NavLink to="/" end>Dashboard</NavLink>
         <NavLink to="/projects">Projects</NavLink>
         <NavLink to="/board">Task Board</NavLink>
+        <NavLink to="/tasks">All Tasks</NavLink>
         <NavLink to="/timesheet">Timesheet</NavLink>
         <NavLink to="/risks">Risks</NavLink>
         <NavLink to="/team">Team Workload</NavLink>
+        <NavLink to="/users">People</NavLink>
         <NavLink to="/audit">Audit Log</NavLink>
+        <NavLink to="/account">My Account</NavLink>
         {me && (
           <div className="user">
             Signed in as <b>{me.username}</b><br />Role: {me.role}
@@ -50,6 +60,10 @@ export default function App() {
       <Route element={<Protected><Shell /></Protected>}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/projects" element={<Projects />} />
+        <Route path="/projects/:id" element={<ProjectDetail />} />
+        <Route path="/tasks" element={<Tasks />} />
+        <Route path="/users" element={<Users />} />
+        <Route path="/account" element={<Account />} />
         <Route path="/board" element={<Board />} />
         <Route path="/timesheet" element={<Timesheet />} />
         <Route path="/risks" element={<Risks />} />

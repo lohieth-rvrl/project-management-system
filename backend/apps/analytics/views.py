@@ -24,6 +24,31 @@ def _overdue_q():
 
 
 @extend_schema(responses=OpenApiTypes.OBJECT)
+class SearchView(APIView):
+    """Quick search across projects, tasks, risks and people: /api/analytics/search/?q=text"""
+
+    def get(self, request):
+        q = request.query_params.get("q", "").strip()
+        if len(q) < 2:
+            return Response({"query": q, "projects": [], "tasks": [], "risks": [], "people": []})
+        projects = Project.objects.filter(Q(code__icontains=q) | Q(name__icontains=q))[:5]
+        tasks = Task.objects.select_related("project").filter(
+            Q(title__icontains=q) | Q(description__icontains=q))[:8]
+        risks = Risk.objects.select_related("project").filter(title__icontains=q)[:5]
+        people = User.objects.filter(is_active=True).filter(
+            Q(username__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q))[:5]
+        return Response({
+            "query": q,
+            "projects": [{"id": p.id, "label": f"{p.code} - {p.name}", "sub": p.status} for p in projects],
+            "tasks": [{"id": t.id, "project": t.project_id, "label": t.title,
+                       "sub": f"{t.project.code} · {t.status}"} for t in tasks],
+            "risks": [{"id": r.id, "project": r.project_id, "label": r.title,
+                       "sub": f"{r.project.code} · score {r.score}"} for r in risks],
+            "people": [{"id": u.id, "label": u.get_full_name() or u.username, "sub": u.role} for u in people],
+        })
+
+
+@extend_schema(responses=OpenApiTypes.OBJECT)
 class OverviewView(APIView):
     """Organisation-wide snapshot for the main dashboard."""
 

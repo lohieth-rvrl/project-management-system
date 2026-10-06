@@ -47,6 +47,41 @@ export default function TaskDrawer({ task, me, onClose }) {
     queryKey: ["comments", task.id], queryFn: () => list(`/comments/?task=${task.id}`),
   });
 
+  const { data: subtasks = [] } = useQuery({
+    queryKey: ["subtasks", task.id], queryFn: () => list(`/tasks/?parent=${task.id}`),
+  });
+  const { data: deps = [] } = useQuery({
+    queryKey: ["deps", task.id], queryFn: () => list(`/task-dependencies/?task=${task.id}`),
+  });
+  const { data: projectTasks = [] } = useQuery({
+    queryKey: ["tasks-of-project", task.project], queryFn: () => list(`/tasks/?project=${task.project}&ordering=title`),
+  });
+  const [newSub, setNewSub] = useState("");
+  const [depPick, setDepPick] = useState("");
+
+  const addSub = useMutation({
+    mutationFn: () => api("/tasks/", { method: "POST", body: { project: task.project, parent: task.id, title: newSub } }),
+    onSuccess: () => { setNewSub(""); qc.invalidateQueries({ queryKey: ["subtasks", task.id] }); refresh(); },
+    onError: (e) => setError(e.message),
+  });
+  const toggleSub = useMutation({
+    mutationFn: ({ id, status }) => api(`/tasks/${id}/`, { method: "PATCH", body: { status } }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["subtasks", task.id] }); refresh(); },
+    onError: (e) => setError(e.message),
+  });
+  const addDep = useMutation({
+    mutationFn: () => api("/task-dependencies/", { method: "POST", body: { task: task.id, depends_on: Number(depPick) } }),
+    onSuccess: () => { setDepPick(""); qc.invalidateQueries({ queryKey: ["deps", task.id] }); },
+    onError: (e) => setError(e.message),
+  });
+  const removeDep = useMutation({
+    mutationFn: (id) => api(`/task-dependencies/${id}/`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["deps", task.id] }),
+    onError: (e) => setError(e.message),
+  });
+  const titleOf = (id) => projectTasks.find((t) => t.id === id)?.title || `Task #${id}`;
+  const taken = new Set([task.id, ...deps.map((d) => d.depends_on)]);
+
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["tasks"] });
     qc.invalidateQueries({ queryKey: ["overview"] });
@@ -135,6 +170,43 @@ export default function TaskDrawer({ task, me, onClose }) {
               )}
             </div>
           )}
+
+          <div>
+            <h2>Subtasks ({subtasks.filter((s) => s.status === "done").length}/{subtasks.length} done)</h2>
+            {subtasks.map((s) => (
+              <label key={s.id} className="row" style={{ margin: "4px 0", color: "var(--ink)", fontSize: 14 }}>
+                <input type="checkbox" style={{ width: "auto" }} checked={s.status === "done"} disabled={!canWrite}
+                  onChange={(e) => toggleSub.mutate({ id: s.id, status: e.target.checked ? "done" : "todo" })} />
+                <span style={{ textDecoration: s.status === "done" ? "line-through" : "none" }}>{s.title}</span>
+              </label>
+            ))}
+            {canWrite && (
+              <form className="row" onSubmit={(e) => { e.preventDefault(); if (newSub.trim()) addSub.mutate(); }}>
+                <input placeholder="Add a subtask" value={newSub} onChange={(e) => setNewSub(e.target.value)} />
+                <button disabled={addSub.isPending || !newSub.trim()}>Add</button>
+              </form>
+            )}
+          </div>
+
+          <div>
+            <h2>Depends on ({deps.length})</h2>
+            {deps.length === 0 && <p className="muted">No dependencies.</p>}
+            {deps.map((d) => (
+              <div key={d.id} className="row" style={{ justifyContent: "space-between", margin: "4px 0" }}>
+                <span>{titleOf(d.depends_on)}</span>
+                {canDelete && <button className="ghost danger" onClick={() => removeDep.mutate(d.id)}>Remove</button>}
+              </div>
+            ))}
+            {canWrite && (
+              <form className="row" onSubmit={(e) => { e.preventDefault(); if (depPick) addDep.mutate(); }}>
+                <select value={depPick} onChange={(e) => setDepPick(e.target.value)}>
+                  <option value="">Must finish first...</option>
+                  {projectTasks.filter((t) => !taken.has(t.id)).map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+                </select>
+                <button disabled={!depPick || addDep.isPending}>Add</button>
+              </form>
+            )}
+          </div>
 
           <div>
             <h2>Comments ({comments.length})</h2>

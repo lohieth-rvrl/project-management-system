@@ -44,8 +44,9 @@ npm install && npm run dev            # http://localhost:5173 (proxies /api to :
 
 ## Tests
 ```bash
-cd backend && python -m pytest -q     # 43 API tests
+cd backend && python -m pytest -q     # 59 API tests
 cd frontend && npm run build
+cd frontend && npx playwright install chromium && npm run e2e   # 13 browser tests (starts its own API + dev server)
 ```
 
 ## Roles

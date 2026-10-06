@@ -60,6 +60,14 @@ label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px
 button.danger { color: var(--bad); border-color: var(--bad); }
 .comment { border-top: 1px solid var(--line); padding: 8px 0; }
 .tcard:hover { border-color: var(--brand-2); }
+.search { position: relative; margin-bottom: 14px; }
+.search input { background: rgba(255,255,255,.12); border-color: transparent; color: #fff; }
+.search input::placeholder { color: #aab8dc; }
+.search-results { position: absolute; left: 0; right: 0; top: 40px; background: #fff; color: var(--ink); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.25); z-index: 40; max-height: 70vh; overflow-y: auto; min-width: 280px; }
+.search-group { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 8px 10px 2px; }
+.search-item { display: flex; flex-direction: column; align-items: flex-start; width: 100%; background: transparent; color: var(--ink); text-align: left; border-radius: 0; padding: 7px 10px; }
+.search-item small { color: var(--muted); }
+.search-item:hover { background: #f0f5ff; }
 .login { max-width: 360px; margin: 12vh auto; }
 .chart { height: 280px; }
 .muted { color: var(--muted); }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useOutletContext } from "react-router-dom";
+import { Link, useOutletContext } from "react-router-dom";
 import { api } from "../api.js";
 import Badge from "../components/Badge.jsx";
 import Pagination from "../components/Pagination.jsx";
@@ -71,7 +71,7 @@ export default function Projects() {
                 const pct = p.task_count ? Math.round((p.done_count / p.task_count) * 100) : 0;
                 return (
                   <tr key={p.id} onClick={() => setSelected(p.id)} style={{ cursor: "pointer", background: selected === p.id ? "#f0f5ff" : undefined }}>
-                    <td><b>{p.code}</b></td><td>{p.name}</td>
+                    <td><Link to={`/projects/${p.id}`} onClick={(e) => e.stopPropagation()}><b>{p.code}</b></Link></td><td>{p.name}</td>
                     <td><Badge value={p.status} /></td><td><Badge value={p.health} /></td>
                     <td style={{ minWidth: 140 }}>
                       <div className="bar"><i style={{ width: `${pct}%` }} /></div>
