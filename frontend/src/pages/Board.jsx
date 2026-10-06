@@ -18,6 +18,8 @@ export default function Board() {
   const [title, setTitle] = useState("");
   const [error, setError] = useState("");
   const [openTask, setOpenTask] = useState(null);
+  const [flt, setFlt] = useState({ q: "", assignee: "", priority: "", overdue: false });
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   const { data: projects = [] } = useQuery({ queryKey: ["projects"], queryFn: () => list("/projects/") });
   const pid = project || projects[0]?.id || "";
@@ -26,6 +28,14 @@ export default function Board() {
   });
 
   const canWrite = me && me.role !== "viewer";
+
+  // Filters apply in the browser: the board already holds every task of the project
+  const visible = tasks.filter((t) =>
+    (!flt.q || t.title.toLowerCase().includes(flt.q.toLowerCase())) &&
+    (!flt.assignee || (flt.assignee === "none" ? !t.assignee : String(t.assignee) === flt.assignee)) &&
+    (!flt.priority || t.priority === flt.priority) &&
+    (!flt.overdue || (t.due_date && t.due_date < todayStr && t.status !== "done")));
+  const assignees = [...new Map(tasks.filter((t) => t.assignee).map((t) => [t.assignee, t.assignee_name])).entries()];
 
   const move = useMutation({
     mutationFn: ({ id, status }) => api(`/tasks/${id}/`, { method: "PATCH", body: { status } }),
@@ -75,10 +85,23 @@ export default function Board() {
       )}
       {error && <div className="error">{error}</div>}
 
+      <div className="row" style={{ marginBottom: 12, flexWrap: "wrap" }}>
+        <input style={{ width: 200 }} placeholder="Filter by title" value={flt.q} onChange={(e) => setFlt({ ...flt, q: e.target.value })} />
+        <select style={{ width: "auto" }} value={flt.assignee} onChange={(e) => setFlt({ ...flt, assignee: e.target.value })}>
+          <option value="">Anyone</option><option value="none">Unassigned</option>
+          {assignees.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+        </select>
+        <select style={{ width: "auto" }} value={flt.priority} onChange={(e) => setFlt({ ...flt, priority: e.target.value })}>
+          <option value="">Any priority</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>
+        </select>
+        <label style={{ margin: 0 }}><input type="checkbox" style={{ width: "auto" }} checked={flt.overdue} onChange={(e) => setFlt({ ...flt, overdue: e.target.checked })} /> Overdue only</label>
+        {(flt.q || flt.assignee || flt.priority || flt.overdue) && <span className="muted">{visible.length} of {tasks.length} tasks</span>}
+      </div>
+
       {isLoading ? <p>Loading...</p> : (
         <div className="board">
           {COLUMNS.map(([key, name]) => {
-            const items = tasks.filter((t) => t.status === key);
+            const items = visible.filter((t) => t.status === key);
             return (
               <div key={key} className={`col ${over === key ? "over" : ""}`}
                 onDragOver={(e) => { if (canWrite) { e.preventDefault(); setOver(key); } }}

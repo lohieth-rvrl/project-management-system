@@ -1,6 +1,8 @@
 // In dev and Docker, requests go to /api and the dev server or Nginx proxies them.
 // On Render the frontend is a separate static site, so VITE_API_URL holds the full
 // backend address, e.g. https://pms-backend.onrender.com/api (set at build time).
+import { queryClient } from "./queryClient.js";
+
 const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 
 export const auth = {
@@ -38,6 +40,7 @@ export async function api(path, { method = "GET", body, retry = true } = {}) {
   }
   if (res.status === 401) {
     auth.clear();
+    queryClient.clear();
     window.location.hash = "#/login"; // hash routing: no server rewrite needed
     throw new Error("Session expired");
   }
@@ -59,6 +62,7 @@ export async function login(username, password) {
     body: JSON.stringify({ username, password }),
   });
   if (!res.ok) throw new Error("Invalid username or password");
+  queryClient.clear(); // never show the previous user's cached data to the new one
   auth.set(await res.json());
 }
 

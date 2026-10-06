@@ -17,6 +17,13 @@ class UserSerializer(serializers.ModelSerializer):
     def get_full_name(self, obj):
         return obj.get_full_name() or obj.username
 
+    def validate_role(self, value):
+        # Only an admin may hand out the admin role (stops a manager promoting themselves)
+        request = self.context.get("request")
+        if value == "admin" and request and request.user.role != "admin":
+            raise serializers.ValidationError("Only an admin can assign the admin role")
+        return value
+
     def create(self, validated_data):
         password = validated_data.pop("password", None)
         user = User(**validated_data)

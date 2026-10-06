@@ -1,3 +1,4 @@
+import django_filters
 from django.utils import timezone
 from rest_framework import viewsets
 
@@ -8,12 +9,30 @@ from .serializers import (CommentSerializer, SprintSerializer, TaskDependencySer
                           TaskSerializer)
 
 
+class TaskFilter(django_filters.FilterSet):
+    overdue = django_filters.BooleanFilter(method="filter_overdue")
+    unassigned = django_filters.BooleanFilter(method="filter_unassigned")
+    due_before = django_filters.DateFilter(field_name="due_date", lookup_expr="lte")
+    due_after = django_filters.DateFilter(field_name="due_date", lookup_expr="gte")
+
+    class Meta:
+        model = Task
+        fields = ["project", "sprint", "status", "priority", "assignee", "parent"]
+
+    def filter_overdue(self, qs, name, value):
+        late = qs.filter(due_date__lt=timezone.localdate()).exclude(status="done")
+        return late if value else qs.exclude(pk__in=late.values("pk"))
+
+    def filter_unassigned(self, qs, name, value):
+        return qs.filter(assignee__isnull=bool(value))
+
+
 class TaskViewSet(viewsets.ModelViewSet):
     queryset = Task.objects.select_related("assignee", "project")
     serializer_class = TaskSerializer
     permission_classes = [RolePermission]
     search_fields = ["title", "description"]
-    filterset_fields = ["project", "sprint", "status", "priority", "assignee", "parent"]
+    filterset_class = TaskFilter
     ordering_fields = ["created_at", "due_date", "priority", "updated_at"]
 
     def perform_create(self, serializer):
