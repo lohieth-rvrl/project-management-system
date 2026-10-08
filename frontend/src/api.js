@@ -88,3 +88,33 @@ export const list = async (path) => {
     page += 1;
   }
 };
+
+// Multipart upload (the browser sets the boundary header itself)
+export async function upload(path, fields, retry = true) {
+  const form = new FormData();
+  Object.entries(fields).forEach(([k, v]) => form.append(k, v));
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST", headers: auth.access ? { Authorization: `Bearer ${auth.access}` } : {}, body: form,
+  });
+  if (res.status === 401 && retry && (await refreshToken())) return upload(path, fields, false);
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data && typeof data === "object"
+      ? Object.entries(data).map(([k, v]) => `${k}: ${[].concat(v).join(" ")}`).join("; ")
+      : `Upload failed (${res.status})`);
+  }
+  return data;
+}
+
+// Files need the login header, so fetch as a blob and save it from memory
+export async function download(path, filename, retry = true) {
+  const res = await fetch(`${BASE}${path}`, { headers: auth.access ? { Authorization: `Bearer ${auth.access}` } : {} });
+  if (res.status === 401 && retry && (await refreshToken())) return download(path, filename, false);
+  if (!res.ok) throw new Error(`Download failed (${res.status})`);
+  const url = URL.createObjectURL(await res.blob());
+  const a = Object.assign(document.createElement("a"), { href: url, download: filename });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

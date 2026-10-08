@@ -1,14 +1,20 @@
+import os
+
 import django_filters
+from django.conf import settings
+from django.http import FileResponse
 from django.utils import timezone
-from rest_framework import viewsets
+from rest_framework import mixins, serializers, viewsets
+from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, MultiPartParser
 
 from apps.accounts.permissions import RolePermission
 from apps.notifications.models import Notification
 from apps.notifications.services import find_mentions, notify
 
-from .models import Comment, Sprint, Task, TaskDependency
-from .serializers import (CommentSerializer, SprintSerializer, TaskDependencySerializer,
-                          TaskSerializer)
+from .models import Attachment, Comment, Sprint, Task, TaskDependency
+from .serializers import (AttachmentSerializer, CommentSerializer, SprintSerializer,
+                          TaskDependencySerializer, TaskSerializer)
 
 
 class TaskFilter(django_filters.FilterSet):
@@ -103,3 +109,51 @@ class CommentViewSet(viewsets.ModelViewSet):
         others = [u for u in (task.assignee, task.reporter) if u and u.pk not in mentioned_ids]
         notify(others, Notification.Kind.COMMENT, f"{who} commented on: {task.title}",
                comment.body[:300], link, actor=actor)
+
+
+BLOCKED_EXTENSIONS = {
+    ".exe", ".bat", ".cmd", ".com", ".msi", ".scr", ".sh", ".ps1", ".vbs", ".js", ".jar",
+    ".html", ".htm", ".svg", ".php", ".dll", ".apk",
+}
+
+
+class AttachmentViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                        mixins.DestroyModelMixin, viewsets.GenericViewSet):
+    """Files attached to a task. Downloads go through the API so they need a valid login."""
+
+    queryset = Attachment.objects.select_related("uploaded_by")
+    serializer_class = AttachmentSerializer
+    permission_classes = [RolePermission]
+    filterset_fields = ["task"]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def perform_create(self, serializer):
+        f = self.request.FILES.get("file")
+        if f is None:
+            raise serializers.ValidationError({"file": "Choose a file to upload"})
+        limit = settings.MAX_UPLOAD_MB * 1024 * 1024
+        if f.size > limit:
+            raise serializers.ValidationError({"file": f"File is larger than {settings.MAX_UPLOAD_MB} MB"})
+        name = os.path.basename(f.name)[:255]
+        if os.path.splitext(name)[1].lower() in BLOCKED_EXTENSIONS:
+            raise serializers.ValidationError({"file": "This file type is not allowed"})
+        att = serializer.save(uploaded_by=self.request.user, name=name, size=f.size,
+                              content_type=(f.content_type or "")[:120])
+        task = att.task
+        notify([task.assignee, task.reporter], Notification.Kind.COMMENT,
+               f"File added to: {task.title}", name, f"/tasks?task={task.id}", actor=self.request.user)
+
+    def perform_destroy(self, instance):
+        storage, path = instance.file.storage, instance.file.name
+        instance.delete()
+        try:
+            storage.delete(path)
+        except Exception:  # noqa: BLE001 - a missing file must not block removing the record
+            pass
+
+    @action(detail=True, methods=["get"])
+    def download(self, request, pk=None):
+        att = self.get_object()
+        resp = FileResponse(att.file.open("rb"), as_attachment=True, filename=att.name)
+        resp["X-Content-Type-Options"] = "nosniff"
+        return resp

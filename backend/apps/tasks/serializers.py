@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Comment, Sprint, Task, TaskDependency
+from .models import Attachment, Comment, Sprint, Task, TaskDependency
 
 
 class SprintSerializer(serializers.ModelSerializer):
@@ -56,3 +56,13 @@ class CommentSerializer(serializers.ModelSerializer):
         model = Comment
         fields = ["id", "task", "author", "author_name", "body", "created_at"]
         read_only_fields = ["author"]
+
+
+class AttachmentSerializer(serializers.ModelSerializer):
+    uploaded_by_name = serializers.CharField(source="uploaded_by.username", read_only=True, default=None)
+
+    class Meta:
+        model = Attachment
+        fields = ["id", "task", "file", "name", "size", "content_type", "uploaded_by", "uploaded_by_name", "created_at"]
+        read_only_fields = ["name", "size", "content_type", "uploaded_by"]
+        extra_kwargs = {"file": {"write_only": True}}

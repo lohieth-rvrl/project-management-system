@@ -72,3 +72,5 @@ button.danger { color: var(--bad); border-color: var(--bad); }
 .chart { height: 280px; }
 .muted { color: var(--muted); }
 @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } .board { grid-template-columns: 1fr; } }
+
+button.link { background: none; border: 0; padding: 0; color: var(--accent, #2563eb); text-decoration: underline; cursor: pointer; }
