@@ -13,3 +13,4 @@ celery>=5.4
 redis>=5.0
 pytest>=8.0
 pytest-django>=4.8
+django-storages[s3]>=1.14

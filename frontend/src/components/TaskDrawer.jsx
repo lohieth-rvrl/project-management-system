@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, list } from "../api.js";
+import { api, download, list, upload } from "../api.js";
 
 const STATUSES = [["todo", "To Do"], ["in_progress", "In Progress"], ["review", "In Review"], ["blocked", "Blocked"], ["done", "Done"]];
 const PRIORITIES = [["low", "Low"], ["medium", "Medium"], ["high", "High"], ["critical", "Critical"]];
@@ -99,6 +99,21 @@ export default function TaskDrawer({ task, me, onClose }) {
     onSuccess: () => { refresh(); onClose(); },
     onError: (e) => setError(e.message),
   });
+  const { data: files = [] } = useQuery({
+    queryKey: ["attachments", task.id], queryFn: () => list(`/attachments/?task=${task.id}`),
+  });
+  const refreshFiles = () => qc.invalidateQueries({ queryKey: ["attachments", task.id] });
+  const addFile = useMutation({
+    mutationFn: (file) => upload("/attachments/", { task: task.id, file }),
+    onSuccess: refreshFiles,
+    onError: (e) => setError(e.message),
+  });
+  const removeFile = useMutation({
+    mutationFn: (id) => api(`/attachments/${id}/`, { method: "DELETE" }),
+    onSuccess: refreshFiles,
+    onError: (e) => setError(e.message),
+  });
+  const fmtSize = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
   const addComment = useMutation({
     mutationFn: () => api("/comments/", { method: "POST", body: { task: task.id, body: comment } }),
     onSuccess: () => { setComment(""); qc.invalidateQueries({ queryKey: ["comments", task.id] }); },
@@ -205,6 +220,26 @@ export default function TaskDrawer({ task, me, onClose }) {
                 </select>
                 <button disabled={!depPick || addDep.isPending}>Add</button>
               </form>
+            )}
+          </div>
+
+          <div>
+            <h2>Attachments ({files.length})</h2>
+            {files.length === 0 && <p className="muted">No files attached.</p>}
+            {files.map((f) => (
+              <div key={f.id} className="comment row">
+                <button type="button" className="link" onClick={() => download(`/attachments/${f.id}/download/`, f.name).catch((e) => setError(e.message))}>{f.name}</button>
+                <span className="muted"> {fmtSize(f.size)} · {f.uploaded_by_name || "unknown"}</span>
+                {canDelete && (
+                  <button type="button" onClick={() => window.confirm(`Remove ${f.name}?`) && removeFile.mutate(f.id)}>Remove</button>
+                )}
+              </div>
+            ))}
+            {canWrite && (
+              <label className="muted">Attach a file (max 10 MB)
+                <input type="file" aria-label="Attach file" disabled={addFile.isPending}
+                  onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; if (f) addFile.mutate(f); }} />
+              </label>
             )}
           </div>
 

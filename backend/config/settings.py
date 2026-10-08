@@ -127,10 +127,27 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT") or BASE_DIR / "media")
+MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "10"))
+
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
 }
+
+# File storage. Local disk by default, which is WIPED on every Render deploy: for real use set
+# S3_BUCKET (any S3-compatible service: AWS S3, Cloudflare R2, Backblaze B2, MinIO, Supabase).
+if os.environ.get("S3_BUCKET"):
+    STORAGES["default"] = {"BACKEND": "storages.backends.s3.S3Storage", "OPTIONS": {
+        "bucket_name": os.environ["S3_BUCKET"],
+        "access_key": os.environ.get("S3_ACCESS_KEY_ID", ""),
+        "secret_key": os.environ.get("S3_SECRET_ACCESS_KEY", ""),
+        "endpoint_url": os.environ.get("S3_ENDPOINT_URL") or None,
+        "region_name": os.environ.get("S3_REGION") or None,
+        "default_acl": None,
+        "querystring_auth": True,
+        "file_overwrite": False,
+    }}
 
 CORS_ALLOW_ALL_ORIGINS = DEBUG
 # Comma-separated frontend origins, e.g. https://pms-frontend.onrender.com

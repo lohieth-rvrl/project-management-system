@@ -81,3 +81,25 @@ class Comment(models.Model):
 
     class Meta:
         ordering = ["created_at"]
+
+
+def attachment_path(instance, filename):
+    # A random folder keeps names unguessable and stops two uploads overwriting each other
+    import uuid
+    return f"attachments/{instance.task_id}/{uuid.uuid4().hex}/{filename}"
+
+
+class Attachment(models.Model):
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="attachments")
+    file = models.FileField(upload_to=attachment_path, max_length=500)
+    name = models.CharField(max_length=255)
+    size = models.PositiveBigIntegerField(default=0)
+    content_type = models.CharField(max_length=120, blank=True)
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.name

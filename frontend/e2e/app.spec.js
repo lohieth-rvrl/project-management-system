@@ -254,3 +254,18 @@ test.describe("notifications", () => {
     await expect(page.getByTestId("unread")).toHaveCount(0);
   });
 });
+
+test.describe("attachments", () => {
+  test("attach a file to a task, download it, and see it listed", async ({ page }) => {
+    await login(page, "priya");
+    await page.getByRole("link", { name: "Task Board" }).click();
+    await page.getByPlaceholder("Add a task and press Enter").fill("E2E attach task");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await page.locator(".tcard", { hasText: "E2E attach task" }).click();
+    const drawer = page.getByRole("dialog", { name: "Task details" });
+    await drawer.getByLabel("Attach file").setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hello e2e") });
+    await expect(drawer.getByRole("button", { name: "notes.txt" })).toBeVisible();
+    const [dl] = await Promise.all([page.waitForEvent("download"), drawer.getByRole("button", { name: "notes.txt" }).click()]);
+    expect(dl.suggestedFilename()).toBe("notes.txt");
+  });
+});
