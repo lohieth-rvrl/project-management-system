@@ -31,7 +31,25 @@ class TaskSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Subtask must belong to the same project as its parent")
         if self.instance and parent and parent.pk == self.instance.pk:
             raise serializers.ValidationError("A task cannot be its own parent")
+        self._check_workflow(data)
         return data
+
+    def _check_workflow(self, data):
+        """Project workflow rules: allowed status moves, and approval for Done."""
+        new = data.get("status")
+        if not self.instance or not new or new == self.instance.status:
+            return
+        old, project = self.instance.status, self.instance.project
+        rules = project.workflow_transitions
+        if rules is not None and old in rules and new not in rules[old]:
+            labels = dict(Task.Status.choices)
+            raise serializers.ValidationError({"status": (
+                f"{project.code} does not allow moving from {labels[old]} to {labels[new]}")})
+        request = self.context.get("request")
+        if (new == Task.Status.DONE and project.done_requires_approval and request
+                and request.user.role not in ("admin", "manager", "lead")):
+            raise serializers.ValidationError({"status": (
+                f"{project.code} requires a lead, manager or admin to mark tasks Done")})
 
 
 class TaskDependencySerializer(serializers.ModelSerializer):

@@ -28,6 +28,12 @@ class Project(models.Model):
                                       help_text="Cost per logged hour, used for cost vs budget")
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
                               on_delete=models.SET_NULL, related_name="owned_projects")
+    # Workflow rules. null = any status change is allowed. Otherwise a map such as
+    # {"todo": ["in_progress"], "in_progress": ["review", "blocked"]}; a status that is
+    # missing from the map is unrestricted, and [] means "no moves out of this status".
+    workflow_transitions = models.JSONField(null=True, blank=True, default=None)
+    done_requires_approval = models.BooleanField(
+        default=False, help_text="Only a lead, manager or admin may move a task to Done")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     history = HistoricalRecords()

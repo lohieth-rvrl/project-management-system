@@ -269,3 +269,24 @@ test.describe("attachments", () => {
     expect(dl.suggestedFilename()).toBe("notes.txt");
   });
 });
+
+test.describe("workflow rules", () => {
+  test("a manager can restrict transitions and the rules persist", async ({ page }) => {
+    await login(page, "meera");
+    await page.getByRole("link", { name: "Projects" }).click();
+    await page.locator("table a").first().click();
+    await page.getByRole("button", { name: "Customise transitions" }).click();
+    await page.getByLabel("To Do to Done").uncheck();
+    await page.getByLabel("Only a lead, manager or admin can mark a task Done", { exact: false }).check();
+    await page.getByRole("button", { name: "Save workflow" }).click();
+    await expect(page.getByText("Saved")).toBeVisible();
+    await page.reload();
+    await expect(page.getByLabel("To Do to Done")).not.toBeChecked();
+    await expect(page.getByLabel("To Do to In Progress")).toBeChecked();
+    // put it back so other tests are unaffected
+    await page.getByRole("button", { name: "Allow any change" }).click();
+    await page.getByLabel("Only a lead, manager or admin can mark a task Done").uncheck();
+    await page.getByRole("button", { name: "Save workflow" }).click();
+    await expect(page.getByText("Saved")).toBeVisible();
+  });
+});

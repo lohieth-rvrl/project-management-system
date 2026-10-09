@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { api, list } from "../api.js";
 import Badge, { label } from "../components/Badge.jsx";
+import WorkflowCard from "../components/WorkflowCard.jsx";
 
 const STATUSES = ["planning", "active", "on_hold", "completed", "cancelled"];
 const HEALTH = ["green", "amber", "red"];
@@ -99,6 +100,8 @@ export default function ProjectDetail() {
           </div>
         )}
       </form>
+
+      <WorkflowCard project={project} canEdit={canDelete} />
 
       <div className="grid two" style={{ marginTop: 16 }}>
         <div className="card">
