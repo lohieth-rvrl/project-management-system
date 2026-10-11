@@ -1,0 +1,36 @@
+# Optional monitoring stack: Prometheus (collects numbers), Grafana (dashboards), Metabase (ask questions).
+#   1. Set METRICS_TOKEN on the backend and copy monitoring/metrics_token.example to monitoring/metrics_token and put the same value in it (one line)
+#   2. Edit the target in monitoring/prometheus.yml
+#   3. docker compose -f docker-compose.monitoring.yml up -d
+# Grafana http://localhost:3001 (admin / admin), Prometheus http://localhost:9090, Metabase http://localhost:3002
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/metrics_token:/etc/prometheus/metrics_token:ro
+      - promdata:/prometheus
+    ports: ["9090:9090"]
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafanadata:/var/lib/grafana
+    ports: ["3001:3000"]
+    depends_on: [prometheus]
+
+  metabase:
+    image: metabase/metabase:latest
+    ports: ["3002:3000"]
+    volumes: [metabasedata:/metabase-data]
+    environment:
+      MB_DB_FILE: /metabase-data/metabase.db
+
+volumes:
+  promdata:
+  grafanadata:
+  metabasedata:

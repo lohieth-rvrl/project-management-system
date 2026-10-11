@@ -1,38 +1,45 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "../api.js";
+import usePaged from "../components/usePaged.js";
 import Pagination from "../components/Pagination.jsx";
 
-export default function Audit() {
-  const { data = [], isLoading } = useQuery({ queryKey: ["audit"], queryFn: () => api("/analytics/audit/?limit=200") });
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+const ENTITIES = ["Task", "Project", "Sprint", "Milestone", "Member", "Risk", "Timesheet", "User"];
 
-  // The audit endpoint returns one merged list, so it is paged here in the browser.
-  const lastPage = Math.max(1, Math.ceil(data.length / pageSize));
-  const current = Math.min(page, lastPage);
-  const rows = data.slice((current - 1) * pageSize, current * pageSize);
+export default function Audit() {
+  const [entity, setEntity] = useState("");
+  const [action, setAction] = useState("");
+  const [user, setUser] = useState("");
+  const qs = new URLSearchParams({ ...(entity && { entity }), ...(action && { action }), ...(user.trim() && { user: user.trim() }) }).toString();
+  const p = usePaged("audit", `/analytics/audit/${qs ? `?${qs}` : ""}`);
 
   return (
     <>
       <h1>Audit Log</h1>
-      <div className="sub">Every create, update and delete on projects and tasks, with who made it (latest 200 changes)</div>
+      <div className="sub">Every create, update and delete across projects, tasks, sprints, milestones, members, risks, timesheets and people</div>
       <div className="card">
-        {isLoading ? <p>Loading...</p> : (
+        <div className="row" style={{ marginBottom: 8 }}>
+          <select aria-label="Filter by type" value={entity} onChange={(e) => setEntity(e.target.value)}>
+            <option value="">All types</option>{ENTITIES.map((x) => <option key={x}>{x}</option>)}
+          </select>
+          <select aria-label="Filter by action" value={action} onChange={(e) => setAction(e.target.value)}>
+            <option value="">All actions</option><option>created</option><option>updated</option><option>deleted</option>
+          </select>
+          <input aria-label="Filter by person" placeholder="Username" value={user} onChange={(e) => setUser(e.target.value)} />
+        </div>
+        {p.isLoading ? <p>Loading...</p> : (
           <table>
             <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Entity</th><th>Name</th></tr></thead>
             <tbody>
-              {rows.map((e, i) => (
+              {p.rows.map((e, i) => (
                 <tr key={`${e.entity}-${e.entity_id}-${e.at}-${i}`}>
                   <td>{new Date(e.at).toLocaleString()}</td><td>{e.by || "system"}</td>
                   <td><span className="badge">{e.action}</span></td><td>{e.entity} #{e.entity_id}</td><td>{e.name}</td>
                 </tr>
               ))}
+              {p.rows.length === 0 && <tr><td colSpan={5} className="muted">No matching changes.</td></tr>}
             </tbody>
           </table>
         )}
-        <Pagination page={current} pageSize={pageSize} count={data.length} onPage={setPage}
-          onPageSize={(n) => { setPageSize(n); setPage(1); }} />
+        <Pagination page={p.page} pageSize={p.pageSize} count={p.count} onPage={p.setPage} onPageSize={p.setPageSize} />
       </div>
     </>
   );

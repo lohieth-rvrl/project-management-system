@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 30s
+scrape_configs:
+  - job_name: pms-backend
+    scheme: https                      # use http for a local backend
+    metrics_path: /api/metrics/
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/metrics_token
+    static_configs:
+      - targets: ["pms-backend-dbgf.onrender.com"]   # change to your backend host (host:port for local, e.g. host.docker.internal:8000)

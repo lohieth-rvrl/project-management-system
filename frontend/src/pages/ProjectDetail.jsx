@@ -5,6 +5,7 @@ import { api, download, list } from "../api.js";
 import Badge, { label } from "../components/Badge.jsx";
 import WorkflowCard from "../components/WorkflowCard.jsx";
 import Gantt from "../components/Gantt.jsx";
+import ProjectCharts from "../components/ProjectCharts.jsx";
 
 const STATUSES = ["planning", "active", "on_hold", "completed", "cancelled"];
 const HEALTH = ["green", "amber", "red"];
@@ -110,6 +111,7 @@ export default function ProjectDetail() {
         <h2>Timeline</h2>
         <Gantt project={project} milestones={milestones} />
       </div>
+      <ProjectCharts project={project} />
       <WorkflowCard project={project} canEdit={canDelete} />
 
       <div className="grid two" style={{ marginTop: 16 }}>

@@ -304,3 +304,21 @@ test.describe("timeline and reports", () => {
     expect(pdf.suggestedFilename()).toMatch(/-report\.pdf$/);
   });
 });
+
+test.describe("audit log and project charts", () => {
+  test("audit log is paged and filterable; project page shows the charts", async ({ page }) => {
+    await login(page, "meera");
+    await page.getByRole("link", { name: "Audit Log" }).click();
+    await expect(page.getByRole("heading", { name: "Audit Log" })).toBeVisible();
+    await expect(page.locator("tbody tr").first()).toBeVisible();
+    await page.getByLabel("Filter by type").selectOption("Risk");
+    await expect(page.locator("tbody tr td:nth-child(4)").first()).toContainText("Risk");
+    await page.getByLabel("Filter by person").fill("nobody-here");
+    await expect(page.getByText("No matching changes.")).toBeVisible();
+
+    await page.getByRole("link", { name: "Projects" }).click();
+    await page.locator("table a").first().click();
+    await expect(page.getByRole("heading", { name: "Burndown and budget" })).toBeVisible();
+    await expect(page.locator(".card canvas, .card svg").first()).toBeVisible();
+  });
+});
