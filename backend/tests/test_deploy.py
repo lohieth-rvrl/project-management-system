@@ -34,13 +34,25 @@ def test_ensure_admin_creates_admin_and_can_log_in(monkeypatch):
     assert r.status_code == 200
 
 
-def test_ensure_admin_is_idempotent_and_updates_password(monkeypatch):
+def test_ensure_admin_does_not_overwrite_a_changed_password(monkeypatch):
+    monkeypatch.setenv("DJANGO_SUPERUSER_USERNAME", "root")
+    monkeypatch.setenv("DJANGO_SUPERUSER_PASSWORD", "first-password-1")
+    call_command("ensure_admin")
+    u = User.objects.get(username="root")
+    u.set_password("changed-in-app-3")  # the admin changed it from My Account
+    u.save()
+    call_command("ensure_admin")  # a redeploy
+    assert User.objects.filter(username="root").count() == 1
+    assert User.objects.get(username="root").check_password("changed-in-app-3")
+
+
+def test_ensure_admin_force_password_resets(monkeypatch):
     monkeypatch.setenv("DJANGO_SUPERUSER_USERNAME", "root")
     monkeypatch.setenv("DJANGO_SUPERUSER_PASSWORD", "first-password-1")
     call_command("ensure_admin")
     monkeypatch.setenv("DJANGO_SUPERUSER_PASSWORD", "second-password-2")
+    monkeypatch.setenv("DJANGO_SUPERUSER_FORCE_PASSWORD", "1")
     call_command("ensure_admin")
-    assert User.objects.filter(username="root").count() == 1
     assert User.objects.get(username="root").check_password("second-password-2")
 
 
