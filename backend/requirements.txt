@@ -16,3 +16,5 @@ pytest-django>=4.8
 django-storages[s3]>=1.14
 openpyxl>=3.1
 reportlab>=4.0
+sentry-sdk>=2.0
+prometheus-client>=0.20

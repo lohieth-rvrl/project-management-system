@@ -181,6 +181,6 @@ def test_audit_log_records_changes(manager, project):
     c = client_for(manager)
     tid = c.post("/api/tasks/", {"project": project.id, "title": "audited"}).data["id"]
     c.patch(f"/api/tasks/{tid}/", {"status": "in_progress"})
-    log = c.get("/api/analytics/audit/").data
+    log = c.get("/api/analytics/audit/").data["results"]
     actions = [e["action"] for e in log if e["entity"] == "Task" and e["entity_id"] == tid]
     assert "created" in actions and "updated" in actions

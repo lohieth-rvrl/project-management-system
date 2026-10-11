@@ -47,6 +47,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "simple_history.middleware.HistoryRequestMiddleware",
+    "config.monitoring.MetricsMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -212,3 +213,12 @@ FRONTEND_URL = os.environ.get("FRONTEND_URL", "")
 NOTIFY_WEBHOOK_URL = os.environ.get("NOTIFY_WEBHOOK_URL", "")
 # Deliver inline instead of on a background thread (used by the tests)
 NOTIFY_SYNC = os.environ.get("NOTIFY_SYNC", "0") == "1"
+
+# --- Monitoring ------------------------------------------------------------------
+# Errors: set SENTRY_DSN (from a free sentry.io project) to start reporting them.
+from .monitoring import init_sentry  # noqa: E402
+
+init_sentry(os.environ.get("SENTRY_DSN", ""), os.environ.get("SENTRY_ENVIRONMENT", "production" if not DEBUG else "development"),
+            float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0")))
+# Metrics: set METRICS_TOKEN to enable GET /api/metrics/ (Authorization: Bearer <token>) for Prometheus.
+METRICS_TOKEN = os.environ.get("METRICS_TOKEN", "")

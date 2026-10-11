@@ -181,25 +181,81 @@ class OverdueTasksView(APIView):
         } for t in qs])
 
 
+def _audited_models():
+    from apps.accounts.models import User as UserModel
+    from apps.projects.models import Milestone, ProjectMember
+    from apps.timesheets.models import TimeEntry as TimeEntryModel
+
+    return {"Task": Task, "Project": Project, "Sprint": Sprint, "Milestone": Milestone,
+            "Member": ProjectMember, "Risk": Risk, "Timesheet": TimeEntryModel, "User": UserModel}
+
+
+AUDIT_ACTIONS = {"created": "+", "updated": "~", "deleted": "-"}
+AUDIT_MAX_DEPTH = 5000  # newest N changes are reachable; keeps the merge cheap
+
+
 @extend_schema(responses=OpenApiTypes.OBJECT)
 class AuditLogView(APIView):
-    """Who changed what and when, merged across the main tracked models."""
+    """Who changed what and when, across every tracked model, newest first.
+
+    Paged like the rest of the API (?page=, ?page_size=) and filterable with
+    ?entity=Task, ?action=created|updated|deleted and ?user=<username>.
+    """
 
     def get(self, request):
-        limit = min(int(request.query_params.get("limit", 50)), 200)
-        entries = []
-        for model, label in ((Task, "Task"), (Project, "Project")):
-            for h in model.history.select_related("history_user").order_by("-history_date")[:limit]:
+        models = _audited_models()
+        entity = request.query_params.get("entity")
+        action = request.query_params.get("action")
+        user = request.query_params.get("user")
+        if entity and entity not in models:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"entity": f"Use one of: {', '.join(models)}"})
+        if action and action not in AUDIT_ACTIONS:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"action": "Use created, updated or deleted"})
+
+        def num(name, default, top):
+            try:
+                return max(1, min(int(request.query_params.get(name, default)), top))
+            except ValueError:
+                return default
+
+        size = num("page_size", 25, 200)
+        page = num("page", 1, 10 ** 6)
+        need = min(page * size, AUDIT_MAX_DEPTH)
+
+        total, entries = 0, []
+        for label, model in models.items():
+            if entity and label != entity:
+                continue
+            qs = model.history.all()
+            if action:
+                qs = qs.filter(history_type=AUDIT_ACTIONS[action])
+            if user:
+                qs = qs.filter(history_user__username=user)
+            total += qs.count()
+            for h in qs.select_related("history_user").order_by("-history_date")[:need]:
+                name = (getattr(h, "title", None) or getattr(h, "name", None)
+                        or getattr(h, "username", None) or f"{label} #{h.id}")
                 entries.append({
-                    "entity": label,
-                    "entity_id": h.id,
-                    "name": getattr(h, "title", None) or getattr(h, "name", ""),
+                    "entity": label, "entity_id": h.id, "name": str(name),
                     "action": {"+": "created", "~": "updated", "-": "deleted"}[h.history_type],
                     "by": h.history_user.username if h.history_user else None,
                     "at": h.history_date,
                 })
         entries.sort(key=lambda e: e["at"], reverse=True)
-        return Response(entries[:limit])
+        offset = (page - 1) * size
+        base = request.build_absolute_uri(request.path)
+        def link(n):
+            q = request.GET.copy()
+            q["page"] = n
+            return f"{base}?{q.urlencode()}"
+        return Response({
+            "count": total,
+            "next": link(page + 1) if offset + size < min(total, AUDIT_MAX_DEPTH) else None,
+            "previous": link(page - 1) if page > 1 else None,
+            "results": entries[offset:offset + size],
+        })
 
 
 class ProjectReportView(APIView):
@@ -223,3 +279,62 @@ class ProjectReportView(APIView):
         resp = HttpResponse(data, content_type=ctype)
         resp["Content-Disposition"] = f'attachment; filename="{project.code}-report.{kind}"'
         return resp
+
+
+def _daterange(start, end):
+    for i in range((end - start).days + 1):
+        yield start + timedelta(days=i)
+
+
+@extend_schema(responses=OpenApiTypes.OBJECT)
+class BurndownView(APIView):
+    """Work remaining per day against an ideal line. ?unit=tasks (default) or hours."""
+
+    MAX_DAYS = 366
+
+    def get(self, request, pk):
+        project = get_object_or_404(Project, pk=pk)
+        unit = "hours" if request.query_params.get("unit") == "hours" else "tasks"
+        tasks = list(project.tasks.filter(parent__isnull=True))
+        today = timezone.localdate()
+        if not tasks:
+            return Response({"unit": unit, "days": [], "remaining": [], "ideal": [], "scope": []})
+        weight = (lambda t: float(t.estimate_hours)) if unit == "hours" else (lambda t: 1)
+        first = min(t.created_at.date() for t in tasks)
+        start = project.start_date or first
+        end = max(project.end_date or today, today) if project.end_date else today
+        start = max(start, end - timedelta(days=self.MAX_DAYS))
+        days = list(_daterange(start, end))
+        remaining, scope = [], []
+        for d in days:
+            existing = [t for t in tasks if t.created_at.date() <= d]
+            open_ = [t for t in existing if not (t.completed_at and t.completed_at.date() <= d)]
+            scope.append(round(sum(weight(t) for t in existing), 2))
+            remaining.append(round(sum(weight(t) for t in open_), 2))
+        planned_end = project.end_date or end
+        total = scope[-1]
+        span = max((planned_end - start).days, 1)
+        ideal = [round(max(total * (1 - (d - start).days / span), 0), 2) for d in days]
+        return Response({"unit": unit, "days": [d.isoformat() for d in days],
+                         "remaining": remaining, "ideal": ideal, "scope": scope})
+
+
+@extend_schema(responses=OpenApiTypes.OBJECT)
+class BudgetTrendView(APIView):
+    """Cumulative cost (logged hours x hourly rate) by week, against the budget."""
+
+    def get(self, request, pk):
+        project = get_object_or_404(Project, pk=pk)
+        rate = float(project.hourly_rate)
+        weekly = {}
+        for e in TimeEntry.objects.filter(task__project=project).values("work_date", "hours"):
+            monday = e["work_date"] - timedelta(days=e["work_date"].weekday())
+            weekly[monday] = weekly.get(monday, 0) + float(e["hours"])
+        weeks, cumulative, running = [], [], 0.0
+        for monday in sorted(weekly):
+            running += weekly[monday] * rate
+            weeks.append(monday.isoformat())
+            cumulative.append(round(running, 2))
+        return Response({"weeks": weeks, "cumulative_cost": cumulative,
+                         "weekly_hours": [round(weekly[m], 2) for m in sorted(weekly)],
+                         "budget": float(project.budget)})

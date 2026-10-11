@@ -10,3 +10,4 @@ e2e.sqlite3
 test-results/
 playwright-report/
 backend/media/
+monitoring/metrics_token
