@@ -79,36 +79,39 @@ class ProjectSummaryView(APIView):
     """Progress, schedule and budget for one project."""
 
     def get(self, request, pk):
-        project = get_object_or_404(Project, pk=pk)
-        tasks = project.tasks.all()
-        total = tasks.count()
-        done = tasks.filter(status="done").count()
-        hours = TimeEntry.objects.filter(task__project=project).aggregate(h=Sum("hours"))["h"] or 0
-        cost = float(hours) * float(project.hourly_rate)
-        budget = float(project.budget)
-        estimate = float(tasks.aggregate(e=Sum("estimate_hours"))["e"] or 0)
-        return Response({
-            "id": project.id,
-            "code": project.code,
-            "name": project.name,
-            "status": project.status,
-            "health": project.health,
-            "total_tasks": total,
-            "done_tasks": done,
-            "progress_percent": round(done / total * 100, 1) if total else 0,
-            "overdue_tasks": tasks.filter(_overdue_q()).count(),
-            "tasks_by_status": _counts(tasks, "status"),
-            "estimated_hours": estimate,
-            "logged_hours": float(hours),
-            "budget": budget,
-            "cost_to_date": round(cost, 2),
-            "budget_used_percent": round(cost / budget * 100, 1) if budget else None,
-            "open_risks": project.risks.exclude(status="closed").count(),
-            "milestones_pending": project.milestones.filter(status="pending").count(),
-            "milestones_missed": project.milestones.filter(
-                Q(status="missed") | Q(status="pending", due_date__lt=timezone.localdate())
-            ).count(),
-        })
+        return Response(project_summary(get_object_or_404(Project, pk=pk)))
+
+
+def project_summary(project):
+    tasks = project.tasks.all()
+    total = tasks.count()
+    done = tasks.filter(status="done").count()
+    hours = TimeEntry.objects.filter(task__project=project).aggregate(h=Sum("hours"))["h"] or 0
+    cost = float(hours) * float(project.hourly_rate)
+    budget = float(project.budget)
+    estimate = float(tasks.aggregate(e=Sum("estimate_hours"))["e"] or 0)
+    return {
+        "id": project.id,
+        "code": project.code,
+        "name": project.name,
+        "status": project.status,
+        "health": project.health,
+        "total_tasks": total,
+        "done_tasks": done,
+        "progress_percent": round(done / total * 100, 1) if total else 0,
+        "overdue_tasks": tasks.filter(_overdue_q()).count(),
+        "tasks_by_status": _counts(tasks, "status"),
+        "estimated_hours": estimate,
+        "logged_hours": float(hours),
+        "budget": budget,
+        "cost_to_date": round(cost, 2),
+        "budget_used_percent": round(cost / budget * 100, 1) if budget else None,
+        "open_risks": project.risks.exclude(status="closed").count(),
+        "milestones_pending": project.milestones.filter(status="pending").count(),
+        "milestones_missed": project.milestones.filter(
+            Q(status="missed") | Q(status="pending", due_date__lt=timezone.localdate())
+        ).count(),
+    }
 
 
 @extend_schema(responses=OpenApiTypes.OBJECT)
@@ -197,3 +200,26 @@ class AuditLogView(APIView):
                 })
         entries.sort(key=lambda e: e["at"], reverse=True)
         return Response(entries[:limit])
+
+
+class ProjectReportView(APIView):
+    """Download a project status report: /api/analytics/projects/<id>/report/?format=xlsx|pdf"""
+
+    @extend_schema(responses=OpenApiTypes.BINARY)
+    def get(self, request, pk):
+        from django.http import HttpResponse
+        from rest_framework.exceptions import ValidationError
+
+        from . import reports
+
+        project = get_object_or_404(Project, pk=pk)
+        kind = request.query_params.get("file", request.query_params.get("format", "xlsx")).lower()
+        if kind not in ("xlsx", "pdf"):
+            raise ValidationError({"file": "Use xlsx or pdf"})
+        data = reports.build_xlsx(project, project_summary(project)) if kind == "xlsx" \
+            else reports.build_pdf(project, project_summary(project))
+        ctype = ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" if kind == "xlsx"
+                 else "application/pdf")
+        resp = HttpResponse(data, content_type=ctype)
+        resp["Content-Disposition"] = f'attachment; filename="{project.code}-report.{kind}"'
+        return resp

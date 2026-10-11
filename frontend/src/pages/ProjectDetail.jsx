@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { api, list } from "../api.js";
+import { api, download, list } from "../api.js";
 import Badge, { label } from "../components/Badge.jsx";
 import WorkflowCard from "../components/WorkflowCard.jsx";
+import Gantt from "../components/Gantt.jsx";
 
 const STATUSES = ["planning", "active", "on_hold", "completed", "cancelled"];
 const HEALTH = ["green", "amber", "red"];
@@ -78,7 +79,11 @@ export default function ProjectDetail() {
     <>
       <div className="toolbar">
         <div><Link to="/projects">&larr; Projects</Link><h1>{project.code}: {project.name}</h1></div>
-        <div className="row"><Badge value={project.status} /><Badge value={project.health} /></div>
+        <div className="row">
+          <Badge value={project.status} /><Badge value={project.health} />
+          <button type="button" className="ghost" onClick={() => download(`/analytics/projects/${pid}/report/?file=xlsx`, `${project.code}-report.xlsx`).catch((e) => setError(e.message))}>Report (Excel)</button>
+          <button type="button" className="ghost" onClick={() => download(`/analytics/projects/${pid}/report/?file=pdf`, `${project.code}-report.pdf`).catch((e) => setError(e.message))}>Report (PDF)</button>
+        </div>
       </div>
       {error && <div className="error">{error}</div>}
 
@@ -101,6 +106,10 @@ export default function ProjectDetail() {
         )}
       </form>
 
+      <div className="card" style={{ marginTop: 16 }}>
+        <h2>Timeline</h2>
+        <Gantt project={project} milestones={milestones} />
+      </div>
       <WorkflowCard project={project} canEdit={canDelete} />
 
       <div className="grid two" style={{ marginTop: 16 }}>

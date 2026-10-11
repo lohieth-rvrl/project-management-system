@@ -290,3 +290,17 @@ test.describe("workflow rules", () => {
     await expect(page.getByText("Saved")).toBeVisible();
   });
 });
+
+test.describe("timeline and reports", () => {
+  test("project page shows the timeline and downloads Excel and PDF reports", async ({ page }) => {
+    await login(page, "meera");
+    await page.getByRole("link", { name: "Projects" }).click();
+    await page.locator("table a").first().click();
+    await expect(page.getByRole("heading", { name: "Timeline" })).toBeVisible();
+    await expect(page.getByLabel("Project timeline").or(page.getByText("to see the timeline"))).toBeVisible();
+    const [xlsx] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Report (Excel)" }).click()]);
+    expect(xlsx.suggestedFilename()).toMatch(/-report\.xlsx$/);
+    const [pdf] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Report (PDF)" }).click()]);
+    expect(pdf.suggestedFilename()).toMatch(/-report\.pdf$/);
+  });
+});

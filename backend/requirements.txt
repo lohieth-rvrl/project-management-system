@@ -14,3 +14,5 @@ redis>=5.0
 pytest>=8.0
 pytest-django>=4.8
 django-storages[s3]>=1.14
+openpyxl>=3.1
+reportlab>=4.0
